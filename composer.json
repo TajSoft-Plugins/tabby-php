@@ -1,0 +1,67 @@
+{
+    "name": "mustafataj/tabby-php",
+    "description": "PHP and Laravel SDK for Tabby Pay in 4 Custom API",
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/TajSoft-Plugins/tabby-php",
+    "support": {
+        "issues": "https://github.com/TajSoft-Plugins/tabby-php/issues",
+        "source": "https://github.com/TajSoft-Plugins/tabby-php"
+    },
+    "keywords": [
+        "tabby",
+        "pay-in-4",
+        "buy-now-pay-later",
+        "laravel",
+        "sdk",
+        "payments"
+    ],
+    "authors": [
+        {
+            "name": "Mustafa Taj ( TajSoft )",
+            "email": "info@mustafataj.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "require-dev": {
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^10.5|^11.0"
+    },
+    "suggest": {
+        "illuminate/support": "Required for Laravel integration (^10.0|^11.0|^12.0)"
+    },
+    "autoload": {
+        "psr-4": {
+            "MustafaTaj\\Tabby\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MustafaTaj\\Tabby\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MustafaTaj\\Tabby\\Laravel\\TabbyServiceProvider"
+            ],
+            "aliases": {
+                "Tabby": "MustafaTaj\\Tabby\\Facades\\Tabby"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

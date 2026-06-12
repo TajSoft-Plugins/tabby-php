@@ -1,0 +1,321 @@
+# Tabby PHP SDK
+
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mustafataj/tabby-php.svg?style=flat-square)](https://packagist.org/packages/mustafataj/tabby-php)
+[![Total Downloads](https://img.shields.io/packagist/dt/mustafataj/tabby-php.svg?style=flat-square)](https://packagist.org/packages/mustafataj/tabby-php)
+[![License](https://img.shields.io/packagist/l/mustafataj/tabby-php.svg?style=flat-square)](LICENSE)
+
+Production-ready PHP SDK for [Tabby Pay in 4 Custom API](https://docs.tabby.ai/pay-in-4-custom-integration/quick-start). Works in plain PHP and Laravel 10+ out of the box.
+
+## Introduction
+
+This package provides a framework-agnostic core with first-class Laravel integration for:
+
+- Creating checkout sessions
+- Retrieving and updating payments
+- Capturing and refunding payments
+- Listing payments
+- Managing webhooks
+
+The SDK uses Guzzle by default and supports injecting a custom HTTP client through `HttpClientInterface`.
+
+## Installation
+
+```bash
+composer require mustafataj/tabby-php
+```
+
+## Laravel Setup
+
+The package auto-registers via Laravel package discovery:
+
+- Service provider: `MustafaTaj\Tabby\Laravel\TabbyServiceProvider`
+- Facade alias: `Tabby`
+
+No manual registration is required for Laravel 10, 11, or 12.
+
+## Publishing Config
+
+```bash
+php artisan vendor:publish --tag=tabby-config
+```
+
+This publishes `config/tabby.php` to your application.
+
+## Environment Variables
+
+Add the following to your `.env`:
+
+```dotenv
+TABBY_SECRET_KEY=sk_test_xxx
+TABBY_MERCHANT_CODE=your_merchant_code
+TABBY_REGION=ksa
+TABBY_BASE_URL=
+TABBY_TIMEOUT=30
+TABBY_CONNECT_TIMEOUT=10
+TABBY_HTTP_DEBUG=false
+```
+
+## Plain PHP Setup
+
+```php
+<?php
+
+require __DIR__.'/vendor/autoload.php';
+
+use MustafaTaj\Tabby\Config\Region;
+use MustafaTaj\Tabby\Tabby;
+
+$tabby = Tabby::make([
+    'secret_key' => 'sk_test_xxx',
+    'merchant_code' => 'your_merchant_code',
+    'region' => Region::KSA,
+]);
+
+$payment = $tabby->payments()->retrieve('payment_id_here');
+```
+
+You can also load configuration from environment variables:
+
+```php
+$tabby = Tabby::fromEnv();
+```
+
+## Region and Base URL
+
+| Region   | Value     | Base URL               |
+|----------|-----------|------------------------|
+| KSA      | `ksa`     | `https://api.tabby.sa` |
+| UAE      | `uae`     | `https://api.tabby.ai` |
+| Kuwait   | `kuwait`  | `https://api.tabby.ai` |
+
+If `base_url` is explicitly configured, it overrides the region mapping.
+
+## Checkout Session Example
+
+```php
+use MustafaTaj\Tabby\Facades\Tabby;
+
+$session = Tabby::checkout()->create([
+    'payment' => [
+        'amount' => '100.00',
+        'currency' => 'SAR',
+        'description' => 'Order #1001',
+        'buyer' => [
+            'phone' => '500000001',
+            'email' => 'otp.success@tabby.ai',
+            'name' => 'Test Customer',
+        ],
+        'order' => [
+            'reference_id' => '1001',
+            'items' => [
+                [
+                    'title' => 'Product name',
+                    'quantity' => 1,
+                    'unit_price' => '100.00',
+                    'reference_id' => 'SKU-001',
+                ],
+            ],
+        ],
+    ],
+    'lang' => 'en',
+    'merchant_urls' => [
+        'success' => route('checkout.success'),
+        'cancel' => route('checkout.cancel'),
+        'failure' => route('checkout.failure'),
+    ],
+]);
+```
+
+If `merchant_code` is omitted from the payload, it is injected from config automatically.
+
+## Redirect to Hosted Payment Page
+
+```php
+$webUrl = $session['configuration']['available_products']['installments'][0]['web_url'] ?? null;
+
+if ($webUrl) {
+    return redirect()->away($webUrl);
+}
+```
+
+## Retrieve Payment Example
+
+```php
+use MustafaTaj\Tabby\Facades\Tabby;
+
+$payment = Tabby::payments()->retrieve($paymentId);
+```
+
+### Dependency Injection
+
+```php
+use MustafaTaj\Tabby\TabbyClient;
+
+class PaymentController
+{
+    public function show(TabbyClient $tabby, string $paymentId)
+    {
+        return response()->json(
+            $tabby->payments()->retrieve($paymentId)
+        );
+    }
+}
+```
+
+## Capture Payment Example
+
+```php
+Tabby::payments()->capture(
+    paymentId: $paymentId,
+    amount: '100.00',
+    referenceId: 'capture-order-1001'
+);
+```
+
+## Refund Payment Example
+
+```php
+Tabby::payments()->refund(
+    paymentId: $paymentId,
+    amount: '50.00',
+    referenceId: 'refund-order-1001-1'
+);
+```
+
+## List Payments Example
+
+```php
+use MustafaTaj\Tabby\DTO\Payment\ListPaymentsQuery;
+
+$payments = Tabby::payments()->list(new ListPaymentsQuery(
+    createdAtGte: '2024-01-01T00:00:00Z',
+    createdAtLte: '2024-12-31T23:59:59Z',
+    limit: 20,
+    offset: 0,
+));
+
+// Or with a raw array:
+$payments = Tabby::payments()->list([
+    'created_at__gte' => '2024-01-01T00:00:00Z',
+    'limit' => 20,
+]);
+```
+
+## Update Payment Example
+
+```php
+Tabby::payments()->update($paymentId, [
+    'reference_id' => 'updated-order-reference',
+]);
+```
+
+## Webhook Registration Example
+
+```php
+Tabby::webhooks()->register(
+    url: 'https://example.com/webhooks/tabby',
+    header: [
+        'title' => 'X-Webhook-Secret',
+        'value' => 'my-secret',
+    ]
+);
+```
+
+Webhook requests automatically include the `X-Merchant-Code` header from config.
+
+## Webhook CRUD Examples
+
+```php
+// List all webhooks
+$webhooks = Tabby::webhooks()->all();
+
+// Retrieve a webhook
+$webhook = Tabby::webhooks()->retrieve($webhookId);
+
+// Update a webhook
+$updated = Tabby::webhooks()->update($webhookId, [
+    'url' => 'https://example.com/webhooks/tabby-v2',
+]);
+
+// Delete a webhook
+Tabby::webhooks()->delete($webhookId);
+```
+
+## Error Handling
+
+```php
+use MustafaTaj\Tabby\Exceptions\ApiException;
+use MustafaTaj\Tabby\Exceptions\AuthenticationException;
+use MustafaTaj\Tabby\Exceptions\ConfigurationException;
+use MustafaTaj\Tabby\Exceptions\NetworkException;
+use MustafaTaj\Tabby\Exceptions\ValidationException;
+
+try {
+    $payment = Tabby::payments()->retrieve($paymentId);
+} catch (AuthenticationException $e) {
+    // HTTP 401 / 403
+} catch (ValidationException $e) {
+    // HTTP 400 / 422
+} catch (ApiException $e) {
+    // Other non-success API responses
+    $status = $e->getStatusCode();
+    $body = $e->getResponseJson();
+} catch (NetworkException $e) {
+    // Connection errors and timeouts
+} catch (ConfigurationException $e) {
+    // Missing or invalid SDK configuration
+}
+```
+
+Exception objects expose sanitized request context and never include raw secret keys.
+
+## Optional DTOs
+
+All resource methods accept plain arrays. DTOs are optional helpers:
+
+```php
+use MustafaTaj\Tabby\DTO\Payment\CapturePaymentData;
+
+Tabby::payments()->captureWithData(
+    paymentId: $paymentId,
+    data: new CapturePaymentData(
+        amount: '100.00',
+        referenceId: 'capture-1001',
+    ),
+);
+```
+
+## Custom HTTP Client
+
+Implement `MustafaTaj\Tabby\Contracts\HttpClientInterface` and pass it to `Tabby::make()`:
+
+```php
+$tabby = Tabby::make($config, $customHttpClient);
+```
+
+## Testing
+
+```bash
+composer validate
+composer dump-autoload
+vendor/bin/phpunit
+vendor/bin/phpstan analyse
+```
+
+The test suite uses mocked HTTP clients and does not make real Tabby API calls.
+
+## Security Notes
+
+- Never commit real Tabby secret keys to source control.
+- Use sandbox/test credentials during development.
+- Store secrets in `.env` or a secure secret manager.
+- Do not expose secret keys to frontend clients.
+- Validate incoming webhook requests in your application according to your security rules and any Tabby-provided headers or secrets.
+
+## Contributing
+
+Contributions are welcome. Please open an issue or pull request on [GitHub](https://github.com/TajSoft-Plugins/tabby-php).
+
+## License
+
+This package is open-sourced software licensed under the [MIT license](LICENSE).
