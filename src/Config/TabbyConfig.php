@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MustafaTaj\Tabby\Config;
 
 use MustafaTaj\Tabby\Exceptions\ConfigurationException;
+use MustafaTaj\Tabby\Support\BooleanParser;
 use MustafaTaj\Tabby\Support\Env;
 
 final class TabbyConfig
@@ -29,7 +30,7 @@ final class TabbyConfig
      */
     public static function fromArray(array $config): self
     {
-        $sandbox = self::resolveBool($config['sandbox'] ?? false);
+        $sandbox = BooleanParser::resolve($config['sandbox'] ?? false);
         [$secretKey, $publicKey] = self::resolveKeys($config, $sandbox);
         $merchantCode = self::stringValue($config['merchant_code'] ?? null);
 
@@ -152,7 +153,7 @@ final class TabbyConfig
 
     public function isHttpDebugEnabled(): bool
     {
-        return (bool) ($this->http['debug'] ?? false);
+        return BooleanParser::resolve($this->http['debug'] ?? false);
     }
 
     /**
@@ -203,25 +204,6 @@ final class TabbyConfig
         }
 
         return trim((string) $value);
-    }
-
-    private static function resolveBool(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return (int) $value !== 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-
-            return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
-        }
-
-        return false;
     }
 
     private static function resolveRegion(mixed $value): ?Region

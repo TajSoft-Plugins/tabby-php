@@ -27,6 +27,6 @@ return [
 
     'http' => [
         'connect_timeout' => (int) env('TABBY_CONNECT_TIMEOUT', 10),
-        'debug' => (bool) env('TABBY_HTTP_DEBUG', false),
+        'debug' => filter_var(env('TABBY_HTTP_DEBUG', false), FILTER_VALIDATE_BOOL),
     ],
 ];

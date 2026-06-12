@@ -23,6 +23,7 @@ final class ConfigTest extends TestCase
             'TABBY_PUBLIC_KEY',
             'TABBY_MERCHANT_CODE',
             'TABBY_REGION',
+            'TABBY_HTTP_DEBUG',
         ];
 
         foreach ($keys as $key) {
@@ -180,5 +181,40 @@ final class ConfigTest extends TestCase
             'timeout' => 30,
             'http' => [],
         ], $config->toArray());
+    }
+
+    public function test_http_debug_disabled_when_env_string_is_false(): void
+    {
+        $_ENV['TABBY_HTTP_DEBUG'] = 'false';
+        $_ENV['TABBY_SANDBOX_SECRET_KEY'] = 'sk_test';
+        $_ENV['TABBY_SANDBOX_PUBLIC_KEY'] = 'pk_test';
+        $_ENV['TABBY_MERCHANT_CODE'] = 'merchant';
+        $_ENV['IS_TABBY_SANDBOX'] = 'true';
+
+        $config = TabbyConfig::fromEnv();
+
+        $this->assertFalse($config->isHttpDebugEnabled());
+    }
+
+    public function test_http_debug_disabled_when_config_value_is_false_string(): void
+    {
+        $config = TabbyConfig::fromArray($this->validConfig([
+            'http' => [
+                'debug' => 'false',
+            ],
+        ]));
+
+        $this->assertFalse($config->isHttpDebugEnabled());
+    }
+
+    public function test_http_debug_enabled_when_config_value_is_true_string(): void
+    {
+        $config = TabbyConfig::fromArray($this->validConfig([
+            'http' => [
+                'debug' => 'true',
+            ],
+        ]));
+
+        $this->assertTrue($config->isHttpDebugEnabled());
     }
 }

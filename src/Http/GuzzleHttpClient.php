@@ -21,13 +21,13 @@ final class GuzzleHttpClient implements HttpClientInterface
         private readonly TabbyConfig $config,
         ?Client $client = null,
     ) {
-        $this->client = $client ?? new Client([
+        $this->client = $client ?? new Client(array_filter([
             'base_uri' => $this->config->getBaseUrl().'/',
             'timeout' => $this->config->getTimeout(),
             'connect_timeout' => $this->config->getConnectTimeout(),
             'http_errors' => false,
-            'debug' => $this->config->isHttpDebugEnabled(),
-        ]);
+            'debug' => $this->config->isHttpDebugEnabled() ? true : null,
+        ], static fn (mixed $value): bool => $value !== null));
     }
 
     public function get(string $path, array $query = [], array $headers = []): Response
