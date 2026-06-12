@@ -101,4 +101,23 @@ final class CheckoutResourceTest extends TestCase
 
         $this->assertSame('ar', $http->lastRequest()['payload']['lang']);
     }
+
+    public function test_web_url_helper_extracts_hosted_payment_page_url(): void
+    {
+        $session = [
+            'configuration' => [
+                'available_products' => [
+                    'installments' => [
+                        ['web_url' => 'https://checkout.tabby.ai/pay/session_1'],
+                    ],
+                ],
+            ],
+            'payment' => ['id' => 'payment_1'],
+        ];
+
+        $client = $this->makeClient(new MockHttpClient());
+
+        $this->assertSame('https://checkout.tabby.ai/pay/session_1', $client->checkout()->webUrl($session));
+        $this->assertSame('payment_1', $client->checkout()->paymentId($session));
+    }
 }

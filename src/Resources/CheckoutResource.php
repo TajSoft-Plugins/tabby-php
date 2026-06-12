@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MustafaTaj\Tabby\Resources;
 
 use MustafaTaj\Tabby\DTO\Checkout\CreateCheckoutSessionData;
+use MustafaTaj\Tabby\Support\CheckoutSession;
 
 final class CheckoutResource extends AbstractResource
 {
@@ -27,6 +28,22 @@ final class CheckoutResource extends AbstractResource
         );
 
         return $this->decode($response);
+    }
+
+    /**
+     * @param array<string, mixed> $session
+     */
+    public function webUrl(array $session, int $installmentIndex = 0): ?string
+    {
+        return CheckoutSession::webUrl($session, $installmentIndex);
+    }
+
+    /**
+     * @param array<string, mixed> $session
+     */
+    public function paymentId(array $session): ?string
+    {
+        return CheckoutSession::paymentId($session);
     }
 
     /**

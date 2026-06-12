@@ -8,13 +8,11 @@ use MustafaTaj\Tabby\DTO\Payment\CapturePaymentData;
 use MustafaTaj\Tabby\DTO\Payment\ListPaymentsQuery;
 use MustafaTaj\Tabby\DTO\Payment\RefundPaymentData;
 use MustafaTaj\Tabby\DTO\Payment\UpdatePaymentData;
+use MustafaTaj\Tabby\Enums\PaymentStatus;
 use MustafaTaj\Tabby\Exceptions\ValidationException;
 
 final class PaymentResource extends AbstractResource
 {
-    private const CAPTURABLE_STATUSES = ['AUTHORIZED'];
-
-    private const COMPLETED_STATUSES = ['CLOSED'];
     /**
      * @return array<string, mixed>
      */
@@ -37,7 +35,8 @@ final class PaymentResource extends AbstractResource
      *     payment: array<string, mixed>,
      *     captured: bool,
      *     capture: array<string, mixed>|null,
-     *     status: string
+     *     status: string,
+     *     successful: bool
      * }
      */
     public function retrieveAndCapture(
@@ -47,24 +46,14 @@ final class PaymentResource extends AbstractResource
         array $extra = [],
     ): array {
         $payment = $this->retrieve($paymentId);
-        $status = strtoupper((string) ($payment['status'] ?? ''));
+        $status = PaymentStatus::tryFromMixed($payment['status'] ?? null);
 
-        if (in_array($status, self::COMPLETED_STATUSES, true)) {
-            return [
-                'payment' => $payment,
-                'captured' => false,
-                'capture' => null,
-                'status' => $status,
-            ];
+        if ($status === PaymentStatus::Closed) {
+            return $this->retrieveAndCaptureResult($payment, false, null, $status);
         }
 
-        if (! in_array($status, self::CAPTURABLE_STATUSES, true)) {
-            return [
-                'payment' => $payment,
-                'captured' => false,
-                'capture' => null,
-                'status' => $status,
-            ];
+        if ($status !== PaymentStatus::Authorized) {
+            return $this->retrieveAndCaptureResult($payment, false, null, $status);
         }
 
         $capture = $this->capture(
@@ -74,11 +63,49 @@ final class PaymentResource extends AbstractResource
             extra: $extra,
         );
 
+        $updatedPayment = $this->retrieve($paymentId);
+        $finalStatus = PaymentStatus::tryFromMixed($capture['status'] ?? $updatedPayment['status'] ?? null) ?? $status;
+
+        return $this->retrieveAndCaptureResult($updatedPayment, true, $capture, $finalStatus);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function close(string $paymentId): array
+    {
+        $response = $this->http->post(
+            sprintf('/api/v2/payments/%s/close', rawurlencode($paymentId)),
+            [],
+            $this->secretHeaders(true),
+        );
+
+        return $this->decode($response);
+    }
+
+    /**
+     * @param array<string, mixed> $payment
+     * @param array<string, mixed>|null $capture
+     * @return array{
+     *     payment: array<string, mixed>,
+     *     captured: bool,
+     *     capture: array<string, mixed>|null,
+     *     status: string,
+     *     successful: bool
+     * }
+     */
+    private function retrieveAndCaptureResult(
+        array $payment,
+        bool $captured,
+        ?array $capture,
+        ?PaymentStatus $status,
+    ): array {
         return [
-            'payment' => $this->retrieve($paymentId),
-            'captured' => true,
+            'payment' => $payment,
+            'captured' => $captured,
             'capture' => $capture,
-            'status' => strtoupper((string) ($capture['status'] ?? $status)),
+            'status' => $status?->value ?? strtoupper((string) ($payment['status'] ?? '')),
+            'successful' => $status?->isSuccessful() ?? false,
         ];
     }
 

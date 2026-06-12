@@ -179,11 +179,17 @@ If `merchant_code` is omitted from the payload, it is injected from config autom
 ## Redirect to Hosted Payment Page
 
 ```php
-$webUrl = $session['configuration']['available_products']['installments'][0]['web_url'] ?? null;
+$webUrl = Tabby::checkout()->webUrl($session);
 
 if ($webUrl) {
     return redirect()->away($webUrl);
 }
+
+// Or use the helper directly:
+use MustafaTaj\Tabby\Support\CheckoutSession;
+
+$webUrl = CheckoutSession::webUrl($session);
+$paymentId = CheckoutSession::paymentId($session);
 ```
 
 ## Retrieve Payment Example
@@ -222,20 +228,45 @@ $result = Tabby::payments()->retrieveAndCapture(
     referenceId: 'capture-order-1001',
 );
 
-if ($result['captured'] && in_array($result['status'], ['CLOSED', 'AUTHORIZED'], true)) {
+if ($result['successful']) {
     // Fulfill the order
 }
 
 // $result shape:
 // [
-//     'payment' => [...],   // latest payment object from Tabby
-//     'captured' => true,   // true when a capture request was sent in this call
-//     'capture' => [...],   // capture response, or null when not captured
+//     'payment' => [...],    // latest payment object from Tabby
+//     'captured' => true,    // true when a capture request was sent in this call
+//     'capture' => [...],    // capture response, or null when not captured
 //     'status' => 'CLOSED',
+//     'successful' => true,  // true for AUTHORIZED or CLOSED payments
 // ]
 ```
 
 `retrieveAndCapture()` retrieves the payment first. If the status is `AUTHORIZED`, it captures the full payment amount (or a custom amount you pass). If the payment is already `CLOSED`, it returns the payment without sending another capture request.
+
+## Close Payment Example
+
+Use this when an order is fully cancelled and should not be captured:
+
+```php
+Tabby::payments()->close($paymentId);
+```
+
+## Payment Status Helper
+
+```php
+use MustafaTaj\Tabby\Enums\PaymentStatus;
+
+$status = PaymentStatus::tryFromMixed($payment['status']);
+
+if ($status?->isCapturable()) {
+    Tabby::payments()->capture($paymentId, $payment['amount']);
+}
+
+if ($status?->isSuccessful()) {
+    // Payment is authorized or closed
+}
+```
 
 ## Capture Payment Example
 
@@ -316,6 +347,38 @@ $updated = Tabby::webhooks()->update($webhookId, [
 Tabby::webhooks()->delete($webhookId);
 ```
 
+## Incoming Webhook Payload Parser
+
+Parse and inspect Tabby webhook POST bodies in your Laravel controller or plain PHP handler:
+
+```php
+use MustafaTaj\Tabby\Webhooks\WebhookPayload;
+
+$payload = WebhookPayload::fromJson($request->getContent());
+
+if (! WebhookPayload::verifyAuthHeader(
+    headers: $request->headers->all(),
+    headerName: 'X-Webhook-Secret',
+    expectedValue: config('services.tabby.webhook_secret'),
+)) {
+    abort(401);
+}
+
+if ($payload->isAuthorizedEvent()) {
+    Tabby::payments()->capture(
+        paymentId: $payload->paymentId(),
+        amount: $payload->amount(),
+        referenceId: $payload->orderReferenceId(),
+    );
+}
+
+if ($payload->isClosedEvent()) {
+    // Payment completed — no action required
+}
+```
+
+Webhook payloads use lowercase statuses (`authorized`, `closed`). The parser normalizes them via `PaymentStatus`.
+
 ## Error Handling
 
 ```php
@@ -378,6 +441,8 @@ vendor/bin/phpstan analyse
 ```
 
 The test suite uses mocked HTTP clients and does not make real Tabby API calls.
+
+GitHub Actions runs the same checks on PHP 8.1 through 8.4 for every push and pull request to `main`.
 
 ## Security Notes
 

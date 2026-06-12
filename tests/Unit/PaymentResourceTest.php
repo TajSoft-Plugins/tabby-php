@@ -136,6 +136,7 @@ final class PaymentResourceTest extends TestCase
         $result = $client->payments()->retrieveAndCapture('payment_1');
 
         $this->assertTrue($result['captured']);
+        $this->assertTrue($result['successful']);
         $this->assertSame('CLOSED', $result['status']);
         $this->assertSame('capture_1', $result['capture']['id']);
         $this->assertSame('CLOSED', $result['payment']['status']);
@@ -160,6 +161,7 @@ final class PaymentResourceTest extends TestCase
         $result = $client->payments()->retrieveAndCapture('payment_1');
 
         $this->assertFalse($result['captured']);
+        $this->assertTrue($result['successful']);
         $this->assertNull($result['capture']);
         $this->assertSame('CLOSED', $result['status']);
         $this->assertCount(1, $http->requests);
@@ -178,9 +180,23 @@ final class PaymentResourceTest extends TestCase
         $result = $client->payments()->retrieveAndCapture('payment_1');
 
         $this->assertFalse($result['captured']);
+        $this->assertFalse($result['successful']);
         $this->assertNull($result['capture']);
         $this->assertSame('REJECTED', $result['status']);
         $this->assertCount(1, $http->requests);
+    }
+
+    public function test_close_payment_uses_post_close_endpoint(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, ['id' => 'payment_1', 'status' => 'CLOSED']);
+
+        $client = $this->makeClient($http);
+        $response = $client->payments()->close('payment_1');
+
+        $this->assertSame(['id' => 'payment_1', 'status' => 'CLOSED'], $response);
+        $this->assertSame('POST', $http->lastRequest()['method']);
+        $this->assertSame('/api/v2/payments/payment_1/close', $http->lastRequest()['path']);
     }
 
     public function test_retrieve_and_capture_uses_custom_amount_and_reference_id(): void
