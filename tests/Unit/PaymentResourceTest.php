@@ -115,4 +115,93 @@ final class PaymentResourceTest extends TestCase
             'offset' => 20,
         ], $http->lastRequest()['query']);
     }
+
+    public function test_retrieve_and_capture_captures_authorized_payment(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, [
+            'id' => 'payment_1',
+            'status' => 'AUTHORIZED',
+            'amount' => '100.00',
+            'order' => ['reference_id' => 'order-1001'],
+        ]);
+        $http->pushJsonResponse(200, ['id' => 'capture_1', 'status' => 'CLOSED']);
+        $http->pushJsonResponse(200, [
+            'id' => 'payment_1',
+            'status' => 'CLOSED',
+            'amount' => '100.00',
+        ]);
+
+        $client = $this->makeClient($http);
+        $result = $client->payments()->retrieveAndCapture('payment_1');
+
+        $this->assertTrue($result['captured']);
+        $this->assertSame('CLOSED', $result['status']);
+        $this->assertSame('capture_1', $result['capture']['id']);
+        $this->assertSame('CLOSED', $result['payment']['status']);
+        $this->assertSame('GET', $http->requests[0]['method']);
+        $this->assertSame('POST', $http->requests[1]['method']);
+        $this->assertSame('/api/v2/payments/payment_1/captures', $http->requests[1]['path']);
+        $this->assertSame('100.00', $http->requests[1]['payload']['amount']);
+        $this->assertSame('order-1001', $http->requests[1]['payload']['reference_id']);
+        $this->assertSame('GET', $http->requests[2]['method']);
+    }
+
+    public function test_retrieve_and_capture_skips_capture_for_closed_payment(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, [
+            'id' => 'payment_1',
+            'status' => 'CLOSED',
+            'amount' => '100.00',
+        ]);
+
+        $client = $this->makeClient($http);
+        $result = $client->payments()->retrieveAndCapture('payment_1');
+
+        $this->assertFalse($result['captured']);
+        $this->assertNull($result['capture']);
+        $this->assertSame('CLOSED', $result['status']);
+        $this->assertCount(1, $http->requests);
+    }
+
+    public function test_retrieve_and_capture_returns_unsuccessful_payment_without_capture(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, [
+            'id' => 'payment_1',
+            'status' => 'REJECTED',
+            'amount' => '100.00',
+        ]);
+
+        $client = $this->makeClient($http);
+        $result = $client->payments()->retrieveAndCapture('payment_1');
+
+        $this->assertFalse($result['captured']);
+        $this->assertNull($result['capture']);
+        $this->assertSame('REJECTED', $result['status']);
+        $this->assertCount(1, $http->requests);
+    }
+
+    public function test_retrieve_and_capture_uses_custom_amount_and_reference_id(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, [
+            'id' => 'payment_1',
+            'status' => 'AUTHORIZED',
+            'amount' => '100.00',
+        ]);
+        $http->pushJsonResponse(200, ['status' => 'CLOSED']);
+        $http->pushJsonResponse(200, ['id' => 'payment_1', 'status' => 'CLOSED']);
+
+        $client = $this->makeClient($http);
+        $client->payments()->retrieveAndCapture(
+            paymentId: 'payment_1',
+            amount: '75.00',
+            referenceId: 'custom-ref',
+        );
+
+        $this->assertSame('75.00', $http->requests[1]['payload']['amount']);
+        $this->assertSame('custom-ref', $http->requests[1]['payload']['reference_id']);
+    }
 }

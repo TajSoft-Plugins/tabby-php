@@ -210,6 +210,33 @@ class PaymentController
 }
 ```
 
+## Success Payment Callback Example
+
+After the customer returns from Tabby's hosted payment page, verify the payment and capture it in one call:
+
+```php
+use MustafaTaj\Tabby\Facades\Tabby;
+
+$result = Tabby::payments()->retrieveAndCapture(
+    paymentId: $paymentId,
+    referenceId: 'capture-order-1001',
+);
+
+if ($result['captured'] && in_array($result['status'], ['CLOSED', 'AUTHORIZED'], true)) {
+    // Fulfill the order
+}
+
+// $result shape:
+// [
+//     'payment' => [...],   // latest payment object from Tabby
+//     'captured' => true,   // true when a capture request was sent in this call
+//     'capture' => [...],   // capture response, or null when not captured
+//     'status' => 'CLOSED',
+// ]
+```
+
+`retrieveAndCapture()` retrieves the payment first. If the status is `AUTHORIZED`, it captures the full payment amount (or a custom amount you pass). If the payment is already `CLOSED`, it returns the payment without sending another capture request.
+
 ## Capture Payment Example
 
 ```php

@@ -8,9 +8,13 @@ use MustafaTaj\Tabby\DTO\Payment\CapturePaymentData;
 use MustafaTaj\Tabby\DTO\Payment\ListPaymentsQuery;
 use MustafaTaj\Tabby\DTO\Payment\RefundPaymentData;
 use MustafaTaj\Tabby\DTO\Payment\UpdatePaymentData;
+use MustafaTaj\Tabby\Exceptions\ValidationException;
 
 final class PaymentResource extends AbstractResource
 {
+    private const CAPTURABLE_STATUSES = ['AUTHORIZED'];
+
+    private const COMPLETED_STATUSES = ['CLOSED'];
     /**
      * @return array<string, mixed>
      */
@@ -23,6 +27,101 @@ final class PaymentResource extends AbstractResource
         );
 
         return $this->decode($response);
+    }
+
+    /**
+     * Retrieve a payment and capture it when authorized (success callback flow).
+     *
+     * @param array<string, mixed> $extra
+     * @return array{
+     *     payment: array<string, mixed>,
+     *     captured: bool,
+     *     capture: array<string, mixed>|null,
+     *     status: string
+     * }
+     */
+    public function retrieveAndCapture(
+        string $paymentId,
+        ?string $amount = null,
+        ?string $referenceId = null,
+        array $extra = [],
+    ): array {
+        $payment = $this->retrieve($paymentId);
+        $status = strtoupper((string) ($payment['status'] ?? ''));
+
+        if (in_array($status, self::COMPLETED_STATUSES, true)) {
+            return [
+                'payment' => $payment,
+                'captured' => false,
+                'capture' => null,
+                'status' => $status,
+            ];
+        }
+
+        if (! in_array($status, self::CAPTURABLE_STATUSES, true)) {
+            return [
+                'payment' => $payment,
+                'captured' => false,
+                'capture' => null,
+                'status' => $status,
+            ];
+        }
+
+        $capture = $this->capture(
+            paymentId: $paymentId,
+            amount: $this->resolveCaptureAmount($payment, $amount),
+            referenceId: $referenceId ?? $this->resolveCaptureReferenceId($payment),
+            extra: $extra,
+        );
+
+        return [
+            'payment' => $this->retrieve($paymentId),
+            'captured' => true,
+            'capture' => $capture,
+            'status' => strtoupper((string) ($capture['status'] ?? $status)),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payment
+     */
+    private function resolveCaptureAmount(array $payment, ?string $amount): string
+    {
+        if ($amount !== null && $amount !== '') {
+            return $amount;
+        }
+
+        $paymentAmount = $payment['amount'] ?? null;
+
+        if (is_string($paymentAmount) && $paymentAmount !== '') {
+            return $paymentAmount;
+        }
+
+        if (is_int($paymentAmount) || is_float($paymentAmount)) {
+            return (string) $paymentAmount;
+        }
+
+        throw new ValidationException('Unable to determine capture amount for authorized payment.');
+    }
+
+    /**
+     * @param array<string, mixed> $payment
+     */
+    private function resolveCaptureReferenceId(array $payment): ?string
+    {
+        $order = $payment['order'] ?? null;
+
+        if (! is_array($order)) {
+            return null;
+        }
+
+        $referenceId = $order['reference_id'] ?? null;
+
+        if (! is_string($referenceId) || $referenceId === '') {
+            return null;
+        }
+
+        return $referenceId;
     }
 
     /**
