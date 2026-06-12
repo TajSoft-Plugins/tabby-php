@@ -18,6 +18,17 @@ This package provides a framework-agnostic core with first-class Laravel integra
 
 The SDK uses Guzzle by default and supports injecting a custom HTTP client through `HttpClientInterface`.
 
+### API keys
+
+Tabby uses two credentials:
+
+| Key | Used for |
+|-----|----------|
+| **Public key** (`pk_test_...` / `pk_...`) | Checkout session creation |
+| **Secret key** (`sk_test_...` / `sk_...`) | Payments and webhooks |
+
+The SDK selects the correct key automatically per endpoint. Use sandbox keys while testing and live keys in production.
+
 ## Installation
 
 ```bash
@@ -46,13 +57,28 @@ This publishes `config/tabby.php` to your application.
 Add the following to your `.env`:
 
 ```dotenv
-TABBY_SECRET_KEY=sk_test_xxx
+IS_TABBY_SANDBOX=true
+
+TABBY_LIVE_SECRET_KEY=sk_xxx
+TABBY_LIVE_PUBLIC_KEY=pk_xxx
+TABBY_SANDBOX_SECRET_KEY=sk_test_xxx
+TABBY_SANDBOX_PUBLIC_KEY=pk_test_xxx
+
 TABBY_MERCHANT_CODE=your_merchant_code
 TABBY_REGION=ksa
 TABBY_BASE_URL=
 TABBY_TIMEOUT=30
 TABBY_CONNECT_TIMEOUT=10
 TABBY_HTTP_DEBUG=false
+```
+
+When `IS_TABBY_SANDBOX=true`, the SDK uses `TABBY_SANDBOX_*` keys. When `false`, it uses `TABBY_LIVE_*` keys.
+
+Optional legacy overrides (used only if the active environment keys are empty):
+
+```dotenv
+TABBY_SECRET_KEY=
+TABBY_PUBLIC_KEY=
 ```
 
 ## Plain PHP Setup
@@ -66,12 +92,34 @@ use MustafaTaj\Tabby\Config\Region;
 use MustafaTaj\Tabby\Tabby;
 
 $tabby = Tabby::make([
-    'secret_key' => 'sk_test_xxx',
+    'sandbox' => true,
+    'keys' => [
+        'sandbox' => [
+            'secret_key' => 'sk_test_xxx',
+            'public_key' => 'pk_test_xxx',
+        ],
+        'live' => [
+            'secret_key' => 'sk_xxx',
+            'public_key' => 'pk_xxx',
+        ],
+    ],
     'merchant_code' => 'your_merchant_code',
     'region' => Region::KSA,
 ]);
 
-$payment = $tabby->payments()->retrieve('payment_id_here');
+$session = $tabby->checkout()->create([...]); // uses public key
+$payment = $tabby->payments()->retrieve('payment_id_here'); // uses secret key
+```
+
+Or pass keys directly without the nested structure:
+
+```php
+$tabby = Tabby::make([
+    'secret_key' => 'sk_test_xxx',
+    'public_key' => 'pk_test_xxx',
+    'merchant_code' => 'your_merchant_code',
+    'region' => Region::KSA,
+]);
 ```
 
 You can also load configuration from environment variables:
@@ -306,10 +354,10 @@ The test suite uses mocked HTTP clients and does not make real Tabby API calls.
 
 ## Security Notes
 
-- Never commit real Tabby secret keys to source control.
-- Use sandbox/test credentials during development.
+- Never commit real Tabby public or secret keys to source control.
+- Use sandbox/test credentials during development (`IS_TABBY_SANDBOX=true`).
 - Store secrets in `.env` or a secure secret manager.
-- Do not expose secret keys to frontend clients.
+- Do not expose secret keys to frontend clients. Public keys are intended for checkout session creation only.
 - Validate incoming webhook requests in your application according to your security rules and any Tabby-provided headers or secrets.
 
 ## Contributing

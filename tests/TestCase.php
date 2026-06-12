@@ -15,6 +15,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     {
         return array_merge([
             'secret_key' => 'sk_test_example_secret_key',
+            'public_key' => 'pk_test_example_public_key',
             'merchant_code' => 'merchant_code_example',
             'region' => Region::KSA,
             'timeout' => 30,

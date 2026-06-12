@@ -19,7 +19,7 @@ final class PaymentResource extends AbstractResource
         $response = $this->http->get(
             sprintf('/api/v2/payments/%s', rawurlencode($paymentId)),
             [],
-            $this->defaultHeaders(),
+            $this->secretHeaders(),
         );
 
         return $this->decode($response);
@@ -36,7 +36,7 @@ final class PaymentResource extends AbstractResource
         $response = $this->http->put(
             sprintf('/api/v2/payments/%s', rawurlencode($paymentId)),
             $data,
-            $this->defaultHeaders(true),
+            $this->secretHeaders(true),
         );
 
         return $this->decode($response);
@@ -70,7 +70,7 @@ final class PaymentResource extends AbstractResource
         $response = $this->http->post(
             sprintf('/api/v2/payments/%s/captures', rawurlencode($paymentId)),
             $data->toArray(),
-            $this->defaultHeaders(true),
+            $this->secretHeaders(true),
         );
 
         return $this->decode($response);
@@ -104,7 +104,7 @@ final class PaymentResource extends AbstractResource
         $response = $this->http->post(
             sprintf('/api/v2/payments/%s/refunds', rawurlencode($paymentId)),
             $data->toArray(),
-            $this->defaultHeaders(true),
+            $this->secretHeaders(true),
         );
 
         return $this->decode($response);
@@ -121,7 +121,7 @@ final class PaymentResource extends AbstractResource
         $response = $this->http->get(
             '/api/v2/payments',
             $params,
-            $this->defaultHeaders(),
+            $this->secretHeaders(),
         );
 
         return $this->decode($response);

@@ -51,6 +51,23 @@ final class CheckoutResourceTest extends TestCase
         $this->assertSame('merchant_code_example', $http->lastRequest()['payload']['merchant_code']);
     }
 
+    public function test_checkout_uses_public_key_and_payments_use_secret_key(): void
+    {
+        $http = new MockHttpClient();
+        $http->pushJsonResponse(200, ['id' => 'session_1']);
+        $http->pushJsonResponse(200, ['id' => 'payment_1']);
+
+        $client = $this->makeClient($http);
+        $client->checkout()->create([
+            'payment' => ['amount' => '10.00', 'currency' => 'SAR'],
+            'lang' => 'en',
+        ]);
+        $client->payments()->retrieve('payment_1');
+
+        $this->assertSame('Bearer pk_test_example_public_key', $http->requests[0]['headers']['Authorization']);
+        $this->assertSame('Bearer sk_test_example_secret_key', $http->requests[1]['headers']['Authorization']);
+    }
+
     public function test_auth_headers_are_attached(): void
     {
         $http = new MockHttpClient();
@@ -65,7 +82,7 @@ final class CheckoutResourceTest extends TestCase
 
         $headers = $http->lastRequest()['headers'];
 
-        $this->assertSame('Bearer sk_test_example_secret_key', $headers['Authorization']);
+        $this->assertSame('Bearer pk_test_example_public_key', $headers['Authorization']);
         $this->assertSame('application/json', $headers['Accept']);
         $this->assertSame('application/json', $headers['Content-Type']);
         $this->assertArrayNotHasKey('X-Merchant-Code', $headers);

@@ -23,7 +23,7 @@ final class CheckoutResource extends AbstractResource
         $response = $this->http->post(
             '/api/v2/checkout',
             $data,
-            $this->defaultHeaders(true),
+            $this->checkoutHeaders(true),
         );
 
         return $this->decode($response);

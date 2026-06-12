@@ -25,7 +25,17 @@ abstract class LaravelTestCase extends OrchestraTestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('tabby', [
-            'secret_key' => 'sk_test_example_secret_key',
+            'sandbox' => true,
+            'keys' => [
+                'live' => [
+                    'secret_key' => 'sk_live_example_secret_key',
+                    'public_key' => 'pk_live_example_public_key',
+                ],
+                'sandbox' => [
+                    'secret_key' => 'sk_test_example_secret_key',
+                    'public_key' => 'pk_test_example_public_key',
+                ],
+            ],
             'merchant_code' => 'merchant_code_example',
             'region' => 'ksa',
             'base_url' => null,

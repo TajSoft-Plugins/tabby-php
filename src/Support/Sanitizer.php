@@ -13,6 +13,7 @@ final class Sanitizer
 
     private const SENSITIVE_PAYLOAD_KEYS = [
         'secret_key',
+        'public_key',
         'token',
     ];
 

@@ -16,6 +16,7 @@ final class ConfigPublishTest extends LaravelTestCase
         $publishedPath = $this->app->configPath('tabby.php');
 
         $this->assertFileExists($publishedPath);
-        $this->assertStringContainsString('TABBY_SECRET_KEY', (string) file_get_contents($publishedPath));
+        $this->assertStringContainsString('IS_TABBY_SANDBOX', (string) file_get_contents($publishedPath));
+        $this->assertStringContainsString('TABBY_SANDBOX_SECRET_KEY', (string) file_get_contents($publishedPath));
     }
 }
