@@ -347,37 +347,100 @@ $updated = Tabby::webhooks()->update($webhookId, [
 Tabby::webhooks()->delete($webhookId);
 ```
 
-## Incoming Webhook Payload Parser
+## Incoming Webhook Handler Example
 
-Parse and inspect Tabby webhook POST bodies in your Laravel controller or plain PHP handler:
+Tabby sends payment updates as a `POST` request with a JSON body. The top-level `id` field is the **payment ID** (the same value as `payment_id` in redirect URLs).
+
+Example payload:
+
+```json
+{
+  "id": "string",
+  "created_at": "2021-09-14T13:08:54Z",
+  "expires_at": "2022-09-14T13:08:54Z",
+  "closed_at": "2021-09-14T13:09:45Z",
+  "status": "closed",
+  "is_test": false,
+  "is_expired": false,
+  "amount": "100",
+  "currency": "SAR",
+  "order": {
+    "reference_id": "string"
+  },
+  "captures": [],
+  "refunds": [],
+  "meta": {
+    "order_id": null,
+    "customer": null
+  },
+  "token": "string"
+}
+```
+
+Laravel controller example — verify the webhook, then retrieve and capture using `$request->input('id')` as the payment ID:
 
 ```php
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use MustafaTaj\Tabby\Facades\Tabby;
 use MustafaTaj\Tabby\Webhooks\WebhookPayload;
 
-$payload = WebhookPayload::fromJson($request->getContent());
+class TabbyWebhookController
+{
+    public function __invoke(Request $request): Response
+    {
+        if (! WebhookPayload::verifyAuthHeader(
+            headers: ['X-Webhook-Secret' => (string) $request->header('X-Webhook-Secret')],
+            headerName: 'X-Webhook-Secret',
+            expectedValue: config('services.tabby.webhook_secret'),
+        )) {
+            abort(401);
+        }
 
-if (! WebhookPayload::verifyAuthHeader(
-    headers: $request->headers->all(),
-    headerName: 'X-Webhook-Secret',
-    expectedValue: config('services.tabby.webhook_secret'),
-)) {
-    abort(401);
+        $payload = WebhookPayload::fromJson($request->getContent());
+        $paymentId = $request->input('id'); // same as $payload->paymentId()
+
+        if ($payload->isAuthorizedEvent()) {
+            $result = Tabby::payments()->retrieveAndCapture(
+                paymentId: $paymentId,
+                referenceId: $payload->orderReferenceId(),
+            );
+
+            if ($result['successful']) {
+                // Fulfill the order in your OMS
+            }
+        }
+
+        if ($payload->isClosedEvent()) {
+            // Payment completed — no capture action required
+        }
+
+        return response('OK', 200);
+    }
 }
+```
+
+Plain PHP example:
+
+```php
+use MustafaTaj\Tabby\Tabby;
+use MustafaTaj\Tabby\Webhooks\WebhookPayload;
+
+$payload = WebhookPayload::fromJson(file_get_contents('php://input'));
+$paymentId = $payload->paymentId(); // reads the "id" field from the webhook body
 
 if ($payload->isAuthorizedEvent()) {
-    Tabby::payments()->capture(
-        paymentId: $payload->paymentId(),
-        amount: $payload->amount(),
+    $tabby = Tabby::make($config);
+    $result = $tabby->payments()->retrieveAndCapture(
+        paymentId: $paymentId,
         referenceId: $payload->orderReferenceId(),
     );
-}
-
-if ($payload->isClosedEvent()) {
-    // Payment completed — no action required
 }
 ```
 
 Webhook payloads use lowercase statuses (`authorized`, `closed`). The parser normalizes them via `PaymentStatus`.
+
+Respond with HTTP `200` immediately and process asynchronously when possible. Always verify the final payment state via the Tabby API — do not rely on the webhook body alone as your only source of truth.
 
 ## Error Handling
 
