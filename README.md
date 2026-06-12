@@ -505,7 +505,7 @@ vendor/bin/phpstan analyse
 
 The test suite uses mocked HTTP clients and does not make real Tabby API calls.
 
-GitHub Actions runs the same checks on PHP 8.1 through 8.4 for every push and pull request to `main`.
+GitHub Actions runs the same checks on PHP 8.2 through 8.4 for every push and pull request to `main`. The package runtime still supports PHP 8.1+; Laravel dev dependencies require PHP 8.2+.
 
 ## Security Notes
 
